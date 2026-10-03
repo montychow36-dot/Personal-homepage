@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { getAssetUrl } from '../../utils/assets';
 
 declare global {
   interface Window {
@@ -73,20 +74,20 @@ export const AudioPlayer: React.FC = () => {
     <>
       <audio 
         ref={bgAudioRef} 
-        src="/Recording_68.m4a" 
+        src={getAssetUrl('Recording_68.m4a')} 
         loop 
         preload="auto" 
         style={{ display: 'none' }} 
       />
       <audio 
         ref={openAudioRef} 
-        src="/Open page.m4a" 
+        src={getAssetUrl('Open page.m4a')} 
         preload="auto" 
         style={{ display: 'none' }} 
       />
       <audio 
         ref={closeAudioRef} 
-        src="/Close page.m4a" 
+        src={getAssetUrl('Close page.m4a')} 
         preload="auto" 
         style={{ display: 'none' }} 
       />

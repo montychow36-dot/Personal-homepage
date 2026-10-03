@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { getAssetUrl } from '../../utils/assets';
 
 export const BackgroundPaper: React.FC = () => {
   return (
@@ -12,7 +13,7 @@ export const BackgroundPaper: React.FC = () => {
       className="fixed inset-0 z-0 pointer-events-none select-none overflow-hidden" 
       style={{ 
         backgroundColor: '#89a4b8',
-        backgroundImage: 'url("/background.jpg")',
+        backgroundImage: `url("${getAssetUrl('background.jpg')}")`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { getAssetUrl } from '../../utils/assets';
 
 export const SoundControl: React.FC = () => {
   const { soundEnabled, toggleSound } = useAppStore();
@@ -20,7 +21,7 @@ export const SoundControl: React.FC = () => {
     <div className="fixed top-0 right-4 md:right-8 z-50 pointer-events-auto" style={{ width: '22vw', height: '22vh' }}>
       <div className="relative w-full h-full overflow-hidden">
         <img 
-          src="/Sound.png" 
+          src={getAssetUrl('Sound.png')} 
           alt="Sound Control" 
           className={`absolute bottom-0 left-0 w-full h-[166.67%] object-contain object-bottom transition-opacity duration-300 ${soundEnabled ? 'opacity-100' : 'opacity-60'}`}
           draggable={false}

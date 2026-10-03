@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { getAssetUrl } from '../../utils/assets';
 
 interface PerspectiveMuseumCanvasProps {
   children?: React.ReactNode;
@@ -27,8 +28,8 @@ export const PerspectiveMuseumCanvas: React.FC<PerspectiveMuseumCanvasProps> = (
   centerOverlay,
   hallTitle = 'MAIN GALLERY',
   className = '',
-  leftBg = '/L.png',
-  rightBg = '/R.png',
+  leftBg = getAssetUrl('L.png'),
+  rightBg = getAssetUrl('R.png'),
   leftContainerClassName = 'scale-[1.0] md:scale-[1.05] origin-left',
   rightContainerClassName = 'scale-[1.15] md:scale-[1.2] origin-right',
 }) => {
