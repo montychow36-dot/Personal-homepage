@@ -1,0 +1,6 @@
+{
+  "name": "Sketch Museum | 手繪素描博物館",
+  "description": "An interactive hand-drawn sketch museum featuring point-and-click exploration, double-buffer page flip transitions, perspective anti-stretching canvas, and Notion API integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

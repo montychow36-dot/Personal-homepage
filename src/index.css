@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "./styles/sketch.css";
+
+@theme {
+  --font-sans: "PMingLiU", "新細明體", serif;
+  --font-serif: "PMingLiU", "新細明體", serif;
+  --font-mono: "PMingLiU", "新細明體", monospace;
+}
+
+body, * {
+  font-family: "PMingLiU", "新細明體", serif !important;
+}

@@ -1,0 +1,148 @@
+        const pageTitle = page.properties?.title?.title?.[0]?.plain_text || '未命名頁面';
+        
+        let blocks: any[] = [];
+        let startCursor: string | undefined = undefined;
+        do {
+          const blocksRes = await fetch(`https://api.notion.com/v1/blocks/${page.id}/children${startCursor ? `?start_cursor=${startCursor}` : ''}`, {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Notion-Version': '2022-06-28',
+            }
+          });
+          if (!blocksRes.ok) break;
+          const bData = await blocksRes.json();
+          blocks = blocks.concat(bData.results || []);
+          startCursor = bData.has_more ? bData.next_cursor : undefined;
+        } while (startCursor);
+
+        const childDbBlock = blocks.find((b: any) => b.type === 'child_database');
+        if (childDbBlock) {
+          const childDbQueryRes = await fetch(`https://api.notion.com/v1/databases/${childDbBlock.id}/query`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Notion-Version': '2022-06-28',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ page_size: 50 }),
+          });
+          if (childDbQueryRes.ok) {
+            const childDbData = await childDbQueryRes.json();
+            const crafts = (childDbData.results || []).map((dbPage: any, idx: number) => {
+              const props = dbPage.properties || {};
+              const titleProp = Object.values(props).find((p: any) => p.type === 'title') as any;
+              const title = titleProp?.title?.[0]?.plain_text || `作品 ${idx + 1}`;
+              const category = props.Category?.select?.name || props.Category?.rich_text?.[0]?.plain_text || '皮格部區域 1';
+              const description = props.Description?.rich_text?.map((r: any) => r.plain_text).join('') || '';
+              const date = props.Date?.date?.start || props.Date?.rich_text?.[0]?.plain_text || '2024';
+              const tags = props.Tags?.multi_select?.map((t: any) => t.name) || ['皮革', '手作'];
+              return { id: dbPage.id, title, category, description, date, tags, images: [] };
+            });
+            allCrafts.push(...crafts);
+          }
+          continue;
+        }
+
+        const hasHeadings = blocks.some((b: any) => {
+          const text = b[b.type]?.rich_text?.map((t: any) => t.plain_text).join('') || '';
+          return text.trim().startsWith('###') || b.type.startsWith('heading_');
+        });
+
+        if (hasHeadings && pageTitle === 'Crafts Gallery') {
+          let currentCraft: any = null;
+          const initializeCraft = (title: string, id: string) => {
+            if (currentCraft) allCrafts.push(currentCraft);
+            currentCraft = { id, title, category: '其他', description: '', date: '2024', images: [], tags: [] };
+          };
+
+          for (const block of blocks) {
+            if (block.type === 'image') {
+              if (!currentCraft) initializeCraft('未命名', block.id);
+              const img = block.image?.file?.url || block.image?.external?.url;
+              if (img) currentCraft.images.push(img);
+              continue;
+            }
+            const text = block[block.type]?.rich_text?.map((t: any) => t.plain_text).join('') || '';
+            const trimmed = text.trim();
+            if (!trimmed) continue;
+            
+            const lower = trimmed.toLowerCase();
+            const isCategoryMarker = lower.startsWith('category') && (lower.includes(':') || lower.includes('：'));
+            const isTitleMarker = trimmed.startsWith('###') || block.type.startsWith('heading_');
+
+            if (isTitleMarker) {
+              initializeCraft(trimmed.replace(/^#+s*/, ''), block.id);
+            } else if (isCategoryMarker) {
+              if (!currentCraft) initializeCraft('未命名', block.id);
+              const lines = trimmed.split('
+');
+              currentCraft.category = lines[0].replace(/^categorys*[:：]s*/i, '').trim() || '其他';
+              if (lines.length > 1) {
+                const rest = lines.slice(1).join('
+').trim();
+                if (rest) currentCraft.description = currentCraft.description ? currentCraft.description + '
+' + rest : rest;
+              }
+            } else {
+              if (!currentCraft) initializeCraft('未命名', block.id);
+              if (lower.startsWith('description') && (lower.includes(':') || lower.includes('：'))) {
+                currentCraft.description = trimmed.replace(/^descriptions*[:：]s*/i, '').trim();
+              } else if (lower.startsWith('image') && (lower.includes(':') || lower.includes('：'))) {
+                // ignore
+              } else {
+                currentCraft.description = currentCraft.description ? currentCraft.description + '
+' + trimmed : trimmed;
+              }
+            }
+          }
+          if (currentCraft && (currentCraft.title !== '未命名' || currentCraft.images.length > 0)) {
+            allCrafts.push(currentCraft);
+          }
+        } else {
+          const craft: any = {
+            id: page.id,
+            title: pageTitle,
+            category: '其他',
+            description: '',
+            date: '2024',
+            images: [],
+            tags: []
+          };
+          for (const block of blocks) {
+            if (block.type === 'image') {
+              const img = block.image?.file?.url || block.image?.external?.url;
+              if (img) craft.images.push(img);
+              continue;
+            }
+            const text = block[block.type]?.rich_text?.map((t: any) => t.plain_text).join('') || '';
+            const trimmed = text.trim();
+            if (!trimmed) continue;
+
+            const lower = trimmed.toLowerCase();
+            if (lower.startsWith('category') && (lower.includes(':') || lower.includes('：'))) {
+              const lines = trimmed.split('
+');
+              const cat = lines[0].replace(/^categorys*[:：]s*/i, '').trim();
+              if (cat) craft.category = cat;
+              if (lines.length > 1) {
+                const rest = lines.slice(1).join('
+').trim();
+                if (rest) craft.description = craft.description ? craft.description + '
+' + rest : rest;
+              }
+            } else if (lower.startsWith('description') && (lower.includes(':') || lower.includes('：'))) {
+              craft.description = trimmed.replace(/^descriptions*[:：]s*/i, '').trim();
+            } else if (lower.startsWith('image') && (lower.includes(':') || lower.includes('：'))) {
+              // ignore
+            } else {
+              craft.description = craft.description ? craft.description + '
+' + trimmed : trimmed;
+            }
+          }
+          
+          if (craft.images.length > 0 || craft.description) {
+            allCrafts.push(craft);
+          }
+        }
+      }
+

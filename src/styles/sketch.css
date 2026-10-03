@@ -1,0 +1,108 @@
+/* Sketchbook & Pencil Aesthetic Custom Styles */
+
+/* Hand-drawn sketchy border generator */
+.sketch-border {
+  border: 2px solid #2d2b2a;
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  box-shadow: 2px 3px 0px rgba(45, 43, 42, 0.15);
+}
+
+.sketch-border-thick {
+  border: 3px solid #2d2b2a;
+  border-radius: 255px 20px 225px 18px/18px 225px 16px 255px;
+  box-shadow: 3px 4px 0px rgba(45, 43, 42, 0.2);
+}
+
+.sketch-button {
+  border: 2px solid #2d2b2a;
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  background-color: transparent;
+  transition: all 0.2s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.sketch-button:hover {
+  transform: scale(1.03) rotate(-1deg);
+  box-shadow: 3px 4px 0px rgba(45, 43, 42, 0.4);
+  background-color: rgba(45, 43, 42, 0.05);
+}
+
+.sketch-button:active {
+  transform: scale(0.98) rotate(0.5deg);
+  box-shadow: 1px 2px 0px rgba(45, 43, 42, 0.4);
+}
+
+.sketch-paper-card {
+  background-color: transparent;
+}
+
+
+.bg-sketch-grid {
+  background-color: #f5f2e9;
+  background-image: 
+    linear-gradient(rgba(180, 175, 160, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180, 175, 160, 0.18) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* 3D Perspective Flip Utilities */
+.perspective-1000 {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Pencil SVG Filter fallback effects */
+.pencil-filter {
+  filter: contrast(110%) brightness(98%) sepia(8%);
+}
+
+/* Hotspot pulse highlight */
+@keyframes sketch-pulse {
+  0% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 0 0 0 rgba(45, 43, 42, 0.4);
+  }
+  50% {
+    transform: scale(1.06) rotate(1deg);
+    box-shadow: 0 0 0 10px rgba(45, 43, 42, 0);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: 0 0 0 0 rgba(45, 43, 42, 0);
+  }
+}
+
+.animate-sketch-pulse {
+  animation: sketch-pulse 2.2s infinite ease-in-out;
+}
+
+/* Custom scrollbar for hand-drawn feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #ede8dc;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #736d65;
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  border: 1px solid #2d2b2a;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4540;
+}
