@@ -4,6 +4,9 @@ on:
   push:
     branches: ["main", "master"]
   workflow_dispatch:
+  schedule:
+    # 每天自動定時從 Notion 同步一次資料
+    - cron: '0 2 * * *'
 
 permissions:
   contents: read
@@ -28,6 +31,12 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Fetch Notion Data
+        env:
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: node scripts/fetch-notion.js
 
       - name: Build site
         run: npx vite build
