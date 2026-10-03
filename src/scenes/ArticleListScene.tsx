@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { fetchCraftsData } from '../services/craftsData';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -11,18 +12,14 @@ export const ArticleListScene: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/notion/crafts')
-      .then((res) => res.json())
-      .then((json) => {
-        if (isMounted && json.data && Array.isArray(json.data)) {
-          const newArticles = json.data.filter((item: any) => {
+    fetchCraftsData()
+      .then((data) => {
+        if (isMounted && data && Array.isArray(data)) {
+          const newArticles = data.filter((item: any) => {
             const cat = (item.category || '').toLowerCase();
             return item.customType === 'article' || cat.includes('article') || cat.includes('blog') || cat.includes('文章');
           });
           
-          // Ensure they are sorted (newest first assuming dates are string sortable, else leave Notion order)
-          // Usually we just reverse the array if Notion returns oldest first, or sort by date.
-          // Let's sort by date descending.
           newArticles.sort((a, b) => {
              const dateA = a.date || a.publishDate || '2024';
              const dateB = b.date || b.publishDate || '2024';

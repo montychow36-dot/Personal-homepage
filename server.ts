@@ -135,7 +135,7 @@ async function getCraftsData(apiKey) {
             const childDbData = await childDbQueryRes.json();
             const crafts = (childDbData.results || []).map((dbPage, idx) => {
               const props = dbPage.properties || {};
-              const titleProp = Object.values(props).find((p) => p.type === 'title');
+              const titleProp = Object.values(props).find((p: any) => p?.type === 'title') as any;
               const title = titleProp?.title?.[0]?.plain_text || `作品 ${idx + 1}`;
               const category = props.Category?.select?.name || props.Category?.rich_text?.[0]?.plain_text || '皮格部區域 1';
               const description = props.Description?.rich_text?.map((r) => r.plain_text).join('') || '';

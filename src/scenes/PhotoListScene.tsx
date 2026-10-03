@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { fetchCraftsData } from '../services/craftsData';
 
 const ITEMS_PER_PAGE = 6;
 
@@ -11,11 +12,10 @@ export const PhotoListScene: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/notion/crafts')
-      .then((res) => res.json())
-      .then((json) => {
-        if (isMounted && json.data && Array.isArray(json.data)) {
-          const newPhotos = json.data.filter((item: any) => {
+    fetchCraftsData()
+      .then((data) => {
+        if (isMounted && data && Array.isArray(data)) {
+          const newPhotos = data.filter((item: any) => {
             const cat = (item.category || '').toLowerCase();
             const title = (item.title || '').toLowerCase();
             return item.customType === 'photo' || cat.includes('photo') || cat.includes('相片') || title.includes('photo') || title.includes('相片');

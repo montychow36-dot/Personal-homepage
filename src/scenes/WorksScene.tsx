@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { ExhibitData } from '../types';
-
+import { fetchCraftsData } from '../services/craftsData';
 
 export const WorksScene: React.FC = () => {
   const { navigateToRoom, setExhibitModal, language } = useAppStore();
@@ -10,11 +10,10 @@ export const WorksScene: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    fetch('/api/notion/crafts')
-      .then((res) => res.json())
-      .then((json) => {
-        if (isMounted && json.data && Array.isArray(json.data) && json.data.length > 0) {
-          const formatted: ExhibitData[] = json.data.map((item: any) => ({
+    fetchCraftsData()
+      .then((data) => {
+        if (isMounted && data && Array.isArray(data) && data.length > 0) {
+          const formatted: ExhibitData[] = data.map((item: any) => ({
             id: item.id || `notion-${Math.random()}`,
             title: { zh: item.title, en: item.title, ja: item.title },
             category: { zh: item.category, en: item.category, ja: item.category },
