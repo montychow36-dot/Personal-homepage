@@ -36,7 +36,12 @@ jobs:
         env:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-        run: node scripts/fetch-notion.js
+        run: |
+          if [ -f "scripts/fetch-notion.js" ]; then
+            node scripts/fetch-notion.js
+          else
+            echo "Notice: scripts/fetch-notion.js not found yet, skipping Notion fetch."
+          fi
 
       - name: Build site
         run: npx vite build
