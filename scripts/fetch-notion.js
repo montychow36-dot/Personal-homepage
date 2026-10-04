@@ -1,6 +1,6 @@
 /**
  * Fetch Notion data at build time and save to public/notion-data.json
- * This enables GitHub Actions to build a 100% static site with live Notion data.
+ * Mirroring server.ts parsing logic for Crafts Gallery, Articles, and Photos.
  */
 
 import fs from 'fs';
@@ -11,18 +11,41 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const outputPath = path.resolve(__dirname, '../public/notion-data.json');
+const srcDir = path.resolve(__dirname, '../src');
 
-function extractId(input) {
-  if (!input) return '';
-  const trimmed = input.trim();
-  const match = trimmed.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
-  return match ? match[1].replace(/-/g, '') : trimmed;
+// Helper to patch any legacy fetch('/api/notion/crafts') in src files before Vite builds
+function patchSourceFiles() {
+  try {
+    if (!fs.existsSync(srcDir)) return;
+    
+    function walk(dir) {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const fullPath = path.join(dir, file);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          walk(fullPath);
+        } else if (file.endsWith('.tsx') || file.endsWith('.ts')) {
+          let content = fs.readFileSync(fullPath, 'utf8');
+          if (content.includes("fetch('/api/notion/crafts')") || content.includes('fetch("/api/notion/crafts")')) {
+            console.log(`[fetch-notion] Patching static data path in ${file}...`);
+            content = content
+              .replace(/fetch\(['"]\/api\/notion\/crafts['"]\)/g, "fetch((import.meta.env.BASE_URL || '/').replace(/\\/+$/, '') + '/notion-data.json')");
+            fs.writeFileSync(fullPath, content, 'utf8');
+          }
+        }
+      }
+    }
+    walk(srcDir);
+  } catch (e) {
+    console.warn('[fetch-notion] Note: Source file patching skipped:', e.message);
+  }
 }
 
 async function main() {
+  patchSourceFiles();
+
   const apiKey = (process.env.NOTION_API_KEY || process.env.NOTION_TOKEN || '').trim();
-  const rawDatabaseId = process.env.NOTION_DATABASE_ID || '';
-  const databaseId = extractId(rawDatabaseId);
 
   if (!apiKey) {
     console.log('[fetch-notion] No NOTION_API_KEY provided in environment. Keeping fallback data.');
@@ -32,7 +55,7 @@ async function main() {
     return;
   }
 
-  console.log('[fetch-notion] Connecting to Notion API...');
+  console.log('[fetch-notion] Connecting to Notion API with provided API token...');
 
   try {
     const headers = {
@@ -41,138 +64,217 @@ async function main() {
       'Content-Type': 'application/json',
     };
 
-    let allCrafts = [];
-    let querySuccess = false;
+    const searchRes = await fetch('https://api.notion.com/v1/search', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        filter: { property: 'object', value: 'page' },
+        page_size: 100,
+      }),
+    });
 
-    if (databaseId) {
-      console.log(`[fetch-notion] Attempting to query database ID: ${databaseId}`);
-      try {
-        let hasMore = true;
-        let startCursor = undefined;
+    if (!searchRes.ok) {
+      const errText = await searchRes.text();
+      throw new Error(`Notion search failed (${searchRes.status}): ${errText}`);
+    }
 
-        while (hasMore) {
-          const body = { page_size: 100 };
-          if (startCursor) body.start_cursor = startCursor;
+    const searchData = await searchRes.json();
+    const pages = searchData.results || [];
+    console.log(`[fetch-notion] Found ${pages.length} accessible pages in workspace.`);
 
-          const res = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-          });
+    const allCrafts = [];
 
-          if (!res.ok) {
-            const errJson = await res.json().catch(() => ({}));
-            console.warn(`[fetch-notion] Database query failed with status ${res.status}:`, errJson.message || errJson);
-            break;
-          }
+    for (const page of pages) {
+      const pageTitle = page.properties?.title?.title?.[0]?.plain_text || '未命名頁面';
+      console.log(`[fetch-notion] Processing page: "${pageTitle}" (${page.id})`);
 
-          const data = await res.json();
-          const pages = data.results || [];
-          querySuccess = true;
+      let blocks = [];
+      let startCursor = undefined;
+      do {
+        const blocksRes = await fetch(
+          `https://api.notion.com/v1/blocks/${page.id}/children${startCursor ? `?start_cursor=${startCursor}` : ''}`,
+          { headers }
+        );
+        if (!blocksRes.ok) break;
+        const bData = await blocksRes.json();
+        blocks = blocks.concat(bData.results || []);
+        startCursor = bData.has_more ? bData.next_cursor : undefined;
+      } while (startCursor);
 
-          for (let i = 0; i < pages.length; i++) {
-            const p = pages[i];
-            const props = p.properties || {};
-
-            const titleProp = Object.values(props).find(prop => prop.type === 'title');
-            const title = titleProp?.title?.[0]?.plain_text || `作品 ${allCrafts.length + 1}`;
-
-            const category =
-              props.Category?.select?.name ||
-              props.Category?.rich_text?.[0]?.plain_text ||
-              props.Category?.name ||
-              '皮格部區域 1';
-
-            const description =
-              props.Description?.rich_text?.map(r => r.plain_text).join('') ||
-              props.Summary?.rich_text?.map(r => r.plain_text).join('') ||
-              '';
-
-            const date =
-              props.Date?.date?.start ||
-              props.Date?.rich_text?.[0]?.plain_text ||
-              '2024';
-
-            const tags =
-              props.Tags?.multi_select?.map(t => t.name) ||
-              props.Tags?.select?.name ? [props.Tags.select.name] : ['皮革', '手作'];
+      const childDbBlock = blocks.find((b) => b.type === 'child_database');
+      if (childDbBlock) {
+        console.log(`[fetch-notion] Querying child database in "${pageTitle}"...`);
+        const childDbRes = await fetch(`https://api.notion.com/v1/databases/${childDbBlock.id}/query`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ page_size: 50 }),
+        });
+        if (childDbRes.ok) {
+          const childDbData = await childDbRes.json();
+          for (let idx = 0; idx < (childDbData.results || []).length; idx++) {
+            const dbPage = childDbData.results[idx];
+            const props = dbPage.properties || {};
+            const titleProp = Object.values(props).find((p) => p?.type === 'title');
+            const title = titleProp?.title?.[0]?.plain_text || `作品 ${idx + 1}`;
+            const category = props.Category?.select?.name || props.Category?.rich_text?.[0]?.plain_text || '皮格部區域 1';
+            const description = props.Description?.rich_text?.map((r) => r.plain_text).join('') || '';
+            const date = props.Date?.date?.start || props.Date?.rich_text?.[0]?.plain_text || '2024';
+            const tags = props.Tags?.multi_select?.map((t) => t.name) || ['皮革', '手作'];
 
             const images = [];
             if (props.Files?.files) {
               for (const f of props.Files.files) {
-                const url = f.file?.url || f.external?.url;
-                if (url) images.push(url);
+                const u = f.file?.url || f.external?.url;
+                if (u) images.push(u);
               }
             }
             if (props.Image?.files) {
               for (const f of props.Image.files) {
-                const url = f.file?.url || f.external?.url;
-                if (url) images.push(url);
+                const u = f.file?.url || f.external?.url;
+                if (u) images.push(u);
               }
             }
-            const imageUrl = images[0] || (p.cover?.file?.url || p.cover?.external?.url) || '';
-
             allCrafts.push({
-              id: p.id,
+              id: dbPage.id,
               title,
               category,
               description,
               date,
               tags,
               images,
-              imageUrl,
+              imageUrl: images[0] || '',
             });
           }
-
-          hasMore = data.has_more;
-          startCursor = data.next_cursor;
         }
-      } catch (dbErr) {
-        console.warn('[fetch-notion] Database query error:', dbErr.message);
+        continue;
       }
-    }
 
-    if (!querySuccess || allCrafts.length === 0) {
-      console.log('[fetch-notion] Searching accessible workspace for pages/databases...');
-      const searchRes = await fetch('https://api.notion.com/v1/search', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ page_size: 50 }),
+      const hasHeadings = blocks.some((b) => {
+        const text = b[b.type]?.rich_text?.map((t) => t.plain_text).join('') || '';
+        return text.trim().startsWith('###') || b.type.startsWith('heading_');
       });
 
-      if (searchRes.ok) {
-        const searchData = await searchRes.json();
-        const results = searchData.results || [];
-        console.log(`[fetch-notion] Search found ${results.length} accessible items in workspace.`);
+      if (hasHeadings && pageTitle === 'Crafts Gallery') {
+        let currentCraft = null;
+        const initializeCraft = (title, id) => {
+          if (currentCraft) allCrafts.push(currentCraft);
+          currentCraft = { id, title, category: '其他', description: '', date: '2024', images: [], tags: ['皮革'] };
+        };
 
-        for (const item of results) {
-          if (item.object === 'database') {
-            const dbQuery = await fetch(`https://api.notion.com/v1/databases/${item.id}/query`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ page_size: 30 }),
-            });
-            if (dbQuery.ok) {
-              const dbData = await dbQuery.json();
-              for (const dbPage of (dbData.results || [])) {
-                const props = dbPage.properties || {};
-                const titleProp = Object.values(props).find(prop => prop.type === 'title');
-                const title = titleProp?.title?.[0]?.plain_text || '作品';
-                const category = props.Category?.select?.name || props.Category?.rich_text?.[0]?.plain_text || '皮格部區域 1';
-                const description = props.Description?.rich_text?.map(r => r.plain_text).join('') || '';
-                const date = props.Date?.date?.start || '2024';
-                const tags = props.Tags?.multi_select?.map(t => t.name) || ['皮革'];
-                allCrafts.push({ id: dbPage.id, title, category, description, date, tags, images: [] });
-              }
+        for (const block of blocks) {
+          if (block.type === 'image') {
+            if (!currentCraft) initializeCraft('未命名', block.id);
+            const img = block.image?.file?.url || block.image?.external?.url;
+            if (img) currentCraft.images.push(img);
+            continue;
+          }
+          const text = block[block.type]?.rich_text?.map((t) => t.plain_text).join('') || '';
+          const trimmed = text.trim();
+          if (!trimmed) continue;
+
+          const lower = trimmed.toLowerCase();
+          const isCategoryMarker = lower.startsWith('category') && (lower.includes(':') || lower.includes('：'));
+          const isTitleMarker = trimmed.startsWith('###') || block.type.startsWith('heading_');
+
+          if (isTitleMarker) {
+            initializeCraft(trimmed.replace(/^#+\s*/, ''), block.id);
+          } else if (isCategoryMarker) {
+            if (!currentCraft) initializeCraft('未命名', block.id);
+            const lines = trimmed.split('\n');
+            currentCraft.category = lines[0].replace(/^category\s*[:：]\s*/i, '').trim() || '其他';
+            if (lines.length > 1) {
+              const rest = lines.slice(1).join('\n').trim();
+              if (rest) currentCraft.description = currentCraft.description ? currentCraft.description + '\n' + rest : rest;
+            }
+          } else {
+            if (!currentCraft) initializeCraft('未命名', block.id);
+            if (lower.startsWith('description') && (lower.includes(':') || lower.includes('：'))) {
+              currentCraft.description = trimmed.replace(/^description\s*[:：]\s*/i, '').trim();
+            } else {
+              currentCraft.description = currentCraft.description ? currentCraft.description + '\n' + trimmed : trimmed;
             }
           }
         }
+        if (currentCraft && (currentCraft.title !== '未命名' || currentCraft.images.length > 0)) {
+          if (currentCraft.images.length > 0) currentCraft.imageUrl = currentCraft.images[0];
+          allCrafts.push(currentCraft);
+        }
+      } else {
+        const craft = {
+          id: page.id,
+          title: pageTitle,
+          category: '其他',
+          description: '',
+          date: '2024',
+          images: [],
+          pages: {},
+          tags: ['手作'],
+        };
+
+        let currentPageKey = null;
+
+        for (const block of blocks) {
+          const text = block[block.type]?.rich_text?.map((t) => t.plain_text).join('') || '';
+          const trimmed = text.trim();
+          const lower = trimmed.toLowerCase();
+
+          if (lower.startsWith('page:') || lower.startsWith('page：')) {
+            const pageNumStr = lower.split(/[:：]/)[1].trim();
+            const pageNum = parseInt(pageNumStr, 10);
+            if (!isNaN(pageNum)) {
+              currentPageKey = pageNum;
+              if (!craft.pages[currentPageKey]) craft.pages[currentPageKey] = [];
+            }
+          } else if (lower.startsWith('photo:') || lower.startsWith('photo：')) {
+            craft.title = text.substring(6).trim();
+            craft.category = 'photo';
+            craft.customType = 'photo';
+          } else if (lower.startsWith('article:') || lower.startsWith('article：')) {
+            let raw = text.substring(8).trim();
+            let titleLines = raw.split('\n');
+            let titleLine = titleLines[0].trim();
+            if (titleLine.startsWith('###')) {
+              titleLine = titleLine.replace(/^###\s*/, '');
+            }
+            if (titleLine) craft.title = titleLine;
+            craft.category = 'article';
+            craft.customType = 'article';
+          } else if (trimmed.startsWith('###')) {
+            if (craft.title === craft.id || craft.title.toLowerCase() === 'article' || craft.title === pageTitle) {
+              craft.title = trimmed.split('\n')[0].replace(/^###\s*/, '').trim();
+            }
+            craft.category = 'article';
+            craft.customType = 'article';
+          }
+
+          if (block.type === 'image') {
+            const img = block.image?.file?.url || block.image?.external?.url;
+            if (img) {
+              craft.images.push(img);
+              if (currentPageKey !== null) {
+                craft.pages[currentPageKey].push(img);
+              }
+            }
+          } else if (lower.startsWith('description') && (lower.includes(':') || lower.includes('：'))) {
+            craft.description = trimmed.replace(/^description\s*[:：]\s*/i, '').trim();
+          } else if (lower.startsWith('category') && (lower.includes(':') || lower.includes('：'))) {
+            const cat = trimmed.replace(/^category\s*[:：]\s*/i, '').trim();
+            if (cat) craft.category = cat;
+          } else {
+            if (text) {
+              craft.description = craft.description ? craft.description + '\n' + trimmed : trimmed;
+            }
+          }
+        }
+
+        if (craft.images.length > 0) craft.imageUrl = craft.images[0];
+        allCrafts.push(craft);
       }
     }
 
-    console.log(`[fetch-notion] Total retrieved crafts: ${allCrafts.length}`);
+    console.log(`[fetch-notion] Successfully retrieved and parsed ${allCrafts.length} total items from Notion!`);
     fs.writeFileSync(outputPath, JSON.stringify({ data: allCrafts, updatedAt: new Date().toISOString() }, null, 2), 'utf-8');
-    console.log(`[fetch-notion] Wrote output to ${outputPath}`);
+    console.log(`[fetch-notion] Saved updated data to ${outputPath}`);
   } catch (err) {
     console.error('[fetch-notion] Warning: Failed to fetch Notion:', err.message);
     if (!fs.existsSync(outputPath)) {
