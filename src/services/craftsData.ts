@@ -7,7 +7,7 @@ import { getAssetUrl } from '../utils/assets';
 export async function fetchCraftsData(): Promise<any[]> {
   // 1. Try local dev server endpoint first
   try {
-    const res = await fetch('/api/notion/crafts');
+    const res = await fetch((import.meta.env.BASE_URL || '/').replace(/\/+$/, '') + '/notion-data.json');
     if (res.ok) {
       const json = await res.json();
       if (json && Array.isArray(json.data) && json.data.length > 0) {
