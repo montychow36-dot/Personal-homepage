@@ -34,8 +34,8 @@ jobs:
 
       - name: Fetch Notion Data
         env:
-          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_API_KEY: ${{ secrets.GITHUBHOMEPAGE || vars.GITHUBHOMEPAGE || secrets.NOTION_API_KEY || vars.NOTION_API_KEY || secrets.NOTION_TOKEN || vars.NOTION_TOKEN || secrets.NOTION_KEY || vars.NOTION_KEY || secrets.NOTION_SECRET || vars.NOTION_SECRET || secrets.NOTION || vars.NOTION || secrets.githubHomepage || vars.githubHomepage }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID || vars.NOTION_DATABASE_ID || secrets.DATABASE_ID || vars.DATABASE_ID }}
         run: |
           if [ -f "scripts/fetch-notion.js" ]; then
             node scripts/fetch-notion.js
