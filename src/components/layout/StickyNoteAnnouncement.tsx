@@ -15,17 +15,22 @@ export const StickyNoteAnnouncement: React.FC = () => {
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1, transition: { delay: 0.5, duration: 0.5 } }}
       >
-        <div className="relative w-16 h-16 md:w-20 md:h-20 bg-[#fef7ba] shadow-[2px_3px_6px_rgba(0,0,0,0.15)] flex items-center justify-center transform rotate-3 transition-transform hover:rotate-1">
-          {/* 膠帶或圖釘 (Tape) */}
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-2 md:w-8 md:h-2.5 bg-white/60 border border-black/5 transform -rotate-2 shadow-sm backdrop-blur-sm"></div>
-          
-          <div className="text-center transform -rotate-3">
-            <span className="block font-serif text-amber-900/80 font-bold text-xs md:text-sm">Notice</span>
-            <span className="block font-serif text-amber-900/60 text-[10px] mt-1 border-t border-amber-900/20 pt-1 mx-2">公告</span>
+        <div className="relative w-16 h-16 md:w-20 md:h-20 flex items-center justify-center transform rotate-3 transition-transform hover:rotate-1 filter drop-shadow-md">
+          {/* 實體便利貼真實材質底圖 */}
+          <img 
+            src={`${(import.meta.env.BASE_URL || '/').replace(/\/+$/, '')}/sticky_notes.png`} 
+            alt="Notice" 
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              // 容錯備用底色
+              (e.currentTarget as HTMLElement).style.display = 'none';
+            }}
+          />
+          <div className="relative z-10 text-center transform -rotate-2 select-none pt-2">
+            <span className="block font-serif text-amber-950/90 font-bold text-xs md:text-sm tracking-wider">Notice</span>
+            <span className="block font-serif text-amber-900/70 text-[9px] md:text-[10px] border-t border-amber-900/20 pt-0.5 mx-1">公告</span>
           </div>
-          
-          {/* 摺角陰影效果 (Slight fold shadow at bottom right) */}
-          <div className="absolute bottom-0 right-0 w-0 h-0 border-b-[8px] border-l-[8px] border-b-transparent border-l-black/10"></div>
         </div>
       </motion.div>
 

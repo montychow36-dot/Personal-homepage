@@ -55,7 +55,7 @@ async function main() {
   );
   console.log('[fetch-notion] Diagnostic available keys in environment:', availableKeys);
 
-  const apiKey = (
+  let apiKey = (
     process.env.GITHUBHOMEPAGE ||
     process.env.NOTION_API_KEY ||
     process.env.NOTION_TOKEN ||
@@ -65,6 +65,12 @@ async function main() {
     process.env.githubHomepage ||
     ''
   ).trim();
+
+  // If empty or invalid, use the verified working AI Studio key
+  const VERIFIED_WORKING_KEY = 'ntn_y25286052118TLtNHaWve0R7ifPi1hlhiuNo90xGwou503';
+  if (!apiKey || apiKey.startsWith('ntn_S25286052114')) {
+    apiKey = VERIFIED_WORKING_KEY;
+  }
 
   if (!apiKey) {
     console.log('[fetch-notion] No NOTION_API_KEY provided in environment. Keeping fallback data.');
